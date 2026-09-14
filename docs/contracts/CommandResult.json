@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CommandResult",
+  "description": "Execution confirmation returned by the Solar Sentry ESP32 edge controller.",
+  "type": "object",
+  "properties": {
+    "command_id": {
+      "type": "string",
+      "description": "Identifier of the executed command"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["SUCCESS", "REJECTED_SAFETY", "INVALID_PARAMS", "EXECUTION_ERROR"],
+      "description": "Execution outcome status"
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable status or error description"
+    },
+    "current_pan": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 180,
+      "description": "Achieved pan position"
+    },
+    "current_tilt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 180,
+      "description": "Achieved tilt position"
+    },
+    "current_state": {
+      "type": "string",
+      "description": "Current edge state following command execution"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "command_id",
+    "status",
+    "current_pan",
+    "current_tilt",
+    "current_state"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Command",
+  "description": "Control command dispatched to the Solar Sentry ESP32 edge controller.",
+  "type": "object",
+  "properties": {
+    "command_id": {
+      "type": "string",
+      "description": "Unique identifier for tracing command execution",
+      "example": "cmd-20260913-001"
+    },
+    "command": {
+      "type": "string",
+      "enum": ["OBSERVE", "PARK", "SCAN", "SET_SERVO", "SET_STATE", "REBOOT", "CALIBRATE", "EMERGENCY_STOP"],
+      "description": "Command verb",
+      "example": "OBSERVE"
+    },
+    "pan": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 180,
+      "description": "Target pan servo angle in degrees (0 to 180)",
+      "example": 90
+    },
+    "tilt": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 180,
+      "description": "Target tilt servo angle in degrees (0 to 180)",
+      "example": 82
+    },
+    "speed": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "description": "Optional speed factor percentage for servo transition",
+      "default": 100
+    },
+    "target_state": {
+      "type": "string",
+      "enum": ["STANDBY", "OBSERVE", "WAIT", "SCAN", "SUSPEND", "SAFE", "DEGRADED"],
+      "description": "Explicit state override if command is SET_STATE"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Dispatch timestamp"
+    }
+  },
+  "required": [
+    "command_id",
+    "command"
+  ]
+}

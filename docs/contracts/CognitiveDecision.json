@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CognitiveDecision",
+  "description": "Structured decision, risk assessment, explanation, and trace produced by Agent 8 (Cognitive Decision Engine) for consumption by Agent 9 (Mission Planner) and Agent 4 (Observatory Dashboard).",
+  "type": "object",
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["OBSERVE", "WAIT", "SCAN", "SUSPEND", "SAFE"],
+      "description": "Authoritative high-level cognitive decision",
+      "example": "OBSERVE"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Calibrated decision confidence score",
+      "example": 0.91
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["LOW", "MODERATE", "HIGH", "CRITICAL"],
+      "description": "Operational risk level",
+      "example": "LOW"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["NORMAL", "DEGRADED", "UNCERTAIN", "SAFE_MODE"],
+      "description": "Observatory cognitive operating mode",
+      "example": "NORMAL"
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Human-readable concise justifications explaining why the decision was made",
+      "example": [
+        "environment suitable",
+        "sensor health normal",
+        "image quality acceptable",
+        "future conditions declining"
+      ]
+    },
+    "fused_utility": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Synthesized observation utility across vision, environment, prediction, and health",
+      "example": 0.81
+    },
+    "total_uncertainty": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Consolidated epistemic and discordance uncertainty",
+      "example": 0.08
+    },
+    "recommended_action": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "example": "ACQUIRE_SCIENCE_TELEMETRY" },
+        "suggested_duration_sec": { "type": "integer", "example": 300 },
+        "safe_stow_required": { "type": "boolean", "example": false },
+        "priority": { "type": "integer", "example": 2 },
+        "guidance": { "type": "string", "example": "Observation conditions suitable; lock tracking loop and capture solar imagery" }
+      },
+      "required": ["action", "suggested_duration_sec", "safe_stow_required", "priority", "guidance"]
+    },
+    "explanation": {
+      "type": "object",
+      "properties": {
+        "primary_reason": { "type": "string" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "positive_factors": { "type": "array" },
+        "negative_factors": { "type": "array" },
+        "counterfactuals": { "type": "array" },
+        "uncertainty_summary": { "type": "string" }
+      },
+      "required": ["primary_reason", "reasons", "positive_factors", "negative_factors", "counterfactuals"]
+    },
+    "trace": {
+      "type": "object",
+      "properties": {
+        "trace_id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "hierarchy_levels_evaluated": { "type": "array", "items": { "type": "string" } },
+        "steps": { "type": "array" },
+        "gating_interlock": { "type": "string" },
+        "fused_utility_score": { "type": "number" },
+        "total_uncertainty": { "type": "number" }
+      },
+      "required": ["trace_id", "timestamp", "hierarchy_levels_evaluated", "steps", "gating_interlock"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Evaluation timestamp (ISO-8601 UTC)",
+      "example": "2026-09-13T11:45:00Z"
+    }
+  },
+  "required": [
+    "decision",
+    "confidence",
+    "risk",
+    "mode",
+    "reasons",
+    "fused_utility",
+    "total_uncertainty",
+    "recommended_action",
+    "explanation",
+    "trace",
+    "timestamp"
+  ]
+}

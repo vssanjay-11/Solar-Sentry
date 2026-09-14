@@ -1,0 +1,27 @@
+# PlatformIO
+.pio
+.pioenvs
+.piolibdeps
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3

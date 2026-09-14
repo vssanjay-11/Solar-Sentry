@@ -1,0 +1,539 @@
+{
+  "$defs": {
+    "ImageSourceType": {
+      "description": "Supported source origins for solar imagery.",
+      "enum": [
+        "ESP32_CAM",
+        "UPLOAD",
+        "HISTORICAL",
+        "OBSERVATORY",
+        "SIMULATION"
+      ],
+      "title": "ImageSourceType",
+      "type": "string"
+    },
+    "ObstructionMetrics": {
+      "description": "Atmospheric and environmental visual obstruction metrics.",
+      "properties": {
+        "obstruction_score": {
+          "description": "Overall occlusion index (0.0=clear, 1.0=fully obstructed)",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Obstruction Score",
+          "type": "number"
+        },
+        "cloud_fraction": {
+          "description": "Estimated cloud fraction across field of view",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Cloud Fraction",
+          "type": "number"
+        },
+        "glare_fraction": {
+          "description": "Saturated glare / scattering fraction",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Glare Fraction",
+          "type": "number"
+        },
+        "limb_integrity": {
+          "description": "Consistency of solar perimeter profile",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Limb Integrity",
+          "type": "number"
+        },
+        "obstruction_type": {
+          "$ref": "#/$defs/ObstructionType",
+          "description": "Categorical obstruction class"
+        }
+      },
+      "required": [
+        "obstruction_score",
+        "cloud_fraction",
+        "glare_fraction",
+        "limb_integrity",
+        "obstruction_type"
+      ],
+      "title": "ObstructionMetrics",
+      "type": "object"
+    },
+    "ObstructionType": {
+      "description": "Visual obstruction classification.",
+      "enum": [
+        "CLEAR",
+        "PARTIAL_CLOUD",
+        "HEAVY_CLOUD",
+        "OVEREXPOSURE_GLARE",
+        "OFF_TARGET"
+      ],
+      "title": "ObstructionType",
+      "type": "string"
+    },
+    "QualityMetrics": {
+      "description": "Objective optical and digital quality measurements.",
+      "properties": {
+        "blur_score": {
+          "description": "Modified Laplacian variance sharpness metric",
+          "minimum": 0.0,
+          "title": "Blur Score",
+          "type": "number"
+        },
+        "tenengrad_score": {
+          "description": "Tenengrad gradient energy density",
+          "minimum": 0.0,
+          "title": "Tenengrad Score",
+          "type": "number"
+        },
+        "exposure_score": {
+          "description": "Dynamic range fidelity (1.0 = well exposed, 0.0 = crushed/blown)",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Exposure Score",
+          "type": "number"
+        },
+        "clipped_black_fraction": {
+          "description": "Fraction of under-saturated pixels (< 5)",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Clipped Black Fraction",
+          "type": "number"
+        },
+        "clipped_white_fraction": {
+          "description": "Fraction of over-saturated pixels (> 250)",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Clipped White Fraction",
+          "type": "number"
+        },
+        "rms_contrast": {
+          "description": "Root mean square luminance contrast",
+          "minimum": 0.0,
+          "title": "Rms Contrast",
+          "type": "number"
+        },
+        "noise_estimate": {
+          "description": "High-frequency noise sigma via Median Absolute Deviation (MAD)",
+          "minimum": 0.0,
+          "title": "Noise Estimate",
+          "type": "number"
+        },
+        "composite_quality": {
+          "description": "Normalized composite quality index",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Composite Quality",
+          "type": "number"
+        },
+        "rating": {
+          "$ref": "#/$defs/QualityRating",
+          "description": "Categorical quality tier"
+        }
+      },
+      "required": [
+        "blur_score",
+        "tenengrad_score",
+        "exposure_score",
+        "clipped_black_fraction",
+        "clipped_white_fraction",
+        "rms_contrast",
+        "noise_estimate",
+        "composite_quality",
+        "rating"
+      ],
+      "title": "QualityMetrics",
+      "type": "object"
+    },
+    "QualityRating": {
+      "description": "Categorical quality tier based on composite score.",
+      "enum": [
+        "EXCELLENT",
+        "USABLE",
+        "DEGRADED",
+        "UNUSABLE"
+      ],
+      "title": "QualityRating",
+      "type": "string"
+    },
+    "SolarDisk": {
+      "description": "Geometric and photometric characterization of the detected solar disk.",
+      "properties": {
+        "center_x": {
+          "description": "Disk centroid X in pixel coordinates",
+          "title": "Center X",
+          "type": "number"
+        },
+        "center_y": {
+          "description": "Disk centroid Y in pixel coordinates",
+          "title": "Center Y",
+          "type": "number"
+        },
+        "radius": {
+          "description": "Disk radius in pixels",
+          "minimum": 0.0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "circularity": {
+          "description": "Form factor 4*pi*Area / Perimeter^2",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Circularity",
+          "type": "number"
+        },
+        "is_clipped": {
+          "default": false,
+          "description": "True if disk boundary touches or exceeds image margins",
+          "title": "Is Clipped",
+          "type": "boolean"
+        },
+        "limb_darkening_fitted": {
+          "default": false,
+          "description": "True if radial profile matches expected solar limb darkening",
+          "title": "Limb Darkening Fitted",
+          "type": "boolean"
+        },
+        "mean_photosphere_intensity": {
+          "default": 0.0,
+          "description": "Average quiet photosphere intensity (0-255)",
+          "maximum": 255.0,
+          "minimum": 0.0,
+          "title": "Mean Photosphere Intensity",
+          "type": "number"
+        },
+        "bounding_box": {
+          "description": "(x, y, w, h) of disk bounding box",
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Bounding Box",
+          "type": "array"
+        }
+      },
+      "required": [
+        "center_x",
+        "center_y",
+        "radius",
+        "circularity",
+        "bounding_box"
+      ],
+      "title": "SolarDisk",
+      "type": "object"
+    },
+    "SunspotCandidate": {
+      "description": "Detected candidate sunspot or dark solar feature.",
+      "properties": {
+        "id": {
+          "description": "Index identifier for this candidate within the frame",
+          "title": "Id",
+          "type": "integer"
+        },
+        "centroid_x": {
+          "description": "Centroid X in full image coordinates",
+          "title": "Centroid X",
+          "type": "number"
+        },
+        "centroid_y": {
+          "description": "Centroid Y in full image coordinates",
+          "title": "Centroid Y",
+          "type": "number"
+        },
+        "disk_relative_r": {
+          "description": "Normalized radial distance from disk center [0=center, 1=limb]",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Disk Relative R",
+          "type": "number"
+        },
+        "disk_relative_theta_deg": {
+          "description": "Polar angle from disk center (degrees)",
+          "maximum": 360.0,
+          "minimum": 0.0,
+          "title": "Disk Relative Theta Deg",
+          "type": "number"
+        },
+        "area_pixels": {
+          "description": "Pixel footprint area",
+          "minimum": 1,
+          "title": "Area Pixels",
+          "type": "integer"
+        },
+        "relative_area_fraction": {
+          "description": "Fraction of solar disk area",
+          "minimum": 0.0,
+          "title": "Relative Area Fraction",
+          "type": "number"
+        },
+        "min_intensity": {
+          "description": "Minimum pixel intensity in spot core",
+          "maximum": 255.0,
+          "minimum": 0.0,
+          "title": "Min Intensity",
+          "type": "number"
+        },
+        "contrast_ratio": {
+          "description": "Darkness ratio relative to surrounding photosphere",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Contrast Ratio",
+          "type": "number"
+        },
+        "has_penumbra": {
+          "default": false,
+          "description": "True if intermediate penumbral intensity halo is resolved",
+          "title": "Has Penumbra",
+          "type": "boolean"
+        },
+        "umbra_area_pixels": {
+          "default": 0,
+          "description": "Area of deep umbral core",
+          "title": "Umbra Area Pixels",
+          "type": "integer"
+        },
+        "confidence": {
+          "description": "Confidence that candidate is a genuine solar feature vs sensor artifact",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "centroid_x",
+        "centroid_y",
+        "disk_relative_r",
+        "disk_relative_theta_deg",
+        "area_pixels",
+        "relative_area_fraction",
+        "min_intensity",
+        "contrast_ratio",
+        "confidence"
+      ],
+      "title": "SunspotCandidate",
+      "type": "object"
+    },
+    "TemporalAnalysisResult": {
+      "description": "Differential analysis between current image and a reference/previous observation.",
+      "properties": {
+        "has_reference": {
+          "default": false,
+          "description": "True if a reference frame was provided",
+          "title": "Has Reference",
+          "type": "boolean"
+        },
+        "registered_successfully": {
+          "default": false,
+          "description": "True if sub-pixel registration succeeded",
+          "title": "Registered Successfully",
+          "type": "boolean"
+        },
+        "translation_x": {
+          "default": 0.0,
+          "description": "Horizontal registration offset in pixels",
+          "title": "Translation X",
+          "type": "number"
+        },
+        "translation_y": {
+          "default": 0.0,
+          "description": "Vertical registration offset in pixels",
+          "title": "Translation Y",
+          "type": "number"
+        },
+        "rotation_deg": {
+          "default": 0.0,
+          "description": "Rotational registration offset in degrees",
+          "title": "Rotation Deg",
+          "type": "number"
+        },
+        "change_score": {
+          "default": 0.0,
+          "description": "Normalized photometric/structural change index",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Change Score",
+          "type": "number"
+        },
+        "motion_detected": {
+          "default": false,
+          "description": "True if jitter or movement beyond threshold was detected",
+          "title": "Motion Detected",
+          "type": "boolean"
+        },
+        "transient_feature_count": {
+          "default": 0,
+          "description": "Number of newly emerged or displaced features",
+          "title": "Transient Feature Count",
+          "type": "integer"
+        }
+      },
+      "title": "TemporalAnalysisResult",
+      "type": "object"
+    }
+  },
+  "description": "Authoritative structured output produced by Agent 5 (Computer Vision).",
+  "properties": {
+    "image_id": {
+      "description": "Unique identifier of analyzed image",
+      "title": "Image Id",
+      "type": "string"
+    },
+    "timestamp": {
+      "description": "ISO 8601 UTC timestamp of analysis",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "source_type": {
+      "$ref": "#/$defs/ImageSourceType",
+      "description": "Data source origin of image"
+    },
+    "image_width": {
+      "description": "Image width in pixels",
+      "minimum": 1,
+      "title": "Image Width",
+      "type": "integer"
+    },
+    "image_height": {
+      "description": "Image height in pixels",
+      "minimum": 1,
+      "title": "Image Height",
+      "type": "integer"
+    },
+    "quality_score": {
+      "description": "Composite optical quality score (0.0-1.0)",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Quality Score",
+      "type": "number"
+    },
+    "solar_disk_detected": {
+      "description": "True if solar disk was identified and localized",
+      "title": "Solar Disk Detected",
+      "type": "boolean"
+    },
+    "sunspot_count": {
+      "default": 0,
+      "description": "Count of confirmed sunspot candidates",
+      "minimum": 0,
+      "title": "Sunspot Count",
+      "type": "integer"
+    },
+    "features": {
+      "description": "High-level descriptive solar feature tags",
+      "items": {
+        "type": "string"
+      },
+      "title": "Features",
+      "type": "array"
+    },
+    "obstruction_score": {
+      "description": "Visual obstruction index (0.0=clear, 1.0=blocked)",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Obstruction Score",
+      "type": "number"
+    },
+    "change_score": {
+      "default": 0.0,
+      "description": "Temporal change score relative to prior frame",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Change Score",
+      "type": "number"
+    },
+    "confidence": {
+      "description": "Overall algorithm confidence score",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "quality_metrics": {
+      "$ref": "#/$defs/QualityMetrics",
+      "description": "Detailed sharpness, exposure, and noise breakdown"
+    },
+    "solar_disk": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SolarDisk"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Detailed disk coordinates and limb profile if detected"
+    },
+    "sunspots": {
+      "description": "List of detected sunspots with coordinates and areas",
+      "items": {
+        "$ref": "#/$defs/SunspotCandidate"
+      },
+      "title": "Sunspots",
+      "type": "array"
+    },
+    "obstruction_metrics": {
+      "$ref": "#/$defs/ObstructionMetrics",
+      "description": "Detailed atmospheric obstruction breakdown"
+    },
+    "temporal_result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TemporalAnalysisResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Registration and change detection details"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "description": "Arbitrary ingestion or sensor metadata",
+      "title": "Metadata",
+      "type": "object"
+    },
+    "warnings": {
+      "description": "Operational warnings or hardware caveats",
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "limitations_disclaimer": {
+      "default": "Solar Sentry Agent 5 provides solar feature localization and optical quality metrics. DO NOT use this module for solar flare prediction; reliable flare forecasting requires calibrated vector magnetograms and dedicated spaceborne instrument data.",
+      "description": "Mandatory scientific disclaimer on model capabilities",
+      "title": "Limitations Disclaimer",
+      "type": "string"
+    }
+  },
+  "required": [
+    "image_id",
+    "source_type",
+    "image_width",
+    "image_height",
+    "quality_score",
+    "solar_disk_detected",
+    "obstruction_score",
+    "confidence",
+    "quality_metrics",
+    "obstruction_metrics"
+  ],
+  "title": "VisionResult",
+  "type": "object"
+}

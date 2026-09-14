@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MissionResult",
+  "description": "Structured post-execution mission report produced by Agent 9 (Mission Planner & Active Perception).",
+  "type": "object",
+  "properties": {
+    "mission_id": {
+      "type": "string",
+      "description": "Identifier of the executed mission"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objective description"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["COMPLETED", "FAILED", "ABORTED", "SUSPENDED"],
+      "description": "Final mission outcome status"
+    },
+    "total_duration_sec": {
+      "type": "number",
+      "minimum": 0.0,
+      "description": "Total execution elapsed time in seconds"
+    },
+    "actions_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "successful_actions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failed_actions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "candidate_evaluations": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "selected_candidate": {
+      "type": ["object", "null"]
+    },
+    "commands_dispatched": {
+      "type": "array",
+      "items": { "$ref": "Command.json#" }
+    },
+    "command_results": {
+      "type": "array",
+      "items": { "$ref": "CommandResult.json#" }
+    },
+    "verification_summary": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["SUCCESS", "FAILED", "SKIPPED"] },
+        "quality_before": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "quality_after": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "delta_quality": { "type": "number" },
+        "converged": { "type": "boolean" },
+        "message": { "type": "string" }
+      },
+      "required": ["status", "converged"]
+    },
+    "active_perception_insights": {
+      "type": "object",
+      "properties": {
+        "triggered": { "type": "boolean" },
+        "uncertainty_before": { "type": "number" },
+        "uncertainty_after": { "type": "number" },
+        "information_gain": { "type": "number" },
+        "notes": { "type": "string" }
+      }
+    },
+    "failure_reason": {
+      "type": ["string", "null"]
+    },
+    "safe_recovery_executed": {
+      "type": "boolean"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "mission_id",
+    "objective",
+    "status",
+    "total_duration_sec",
+    "actions_count",
+    "successful_actions",
+    "failed_actions",
+    "verification_summary",
+    "timestamp"
+  ]
+}

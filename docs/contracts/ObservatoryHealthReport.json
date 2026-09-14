@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ObservatoryHealthReport",
+  "description": "Structured health assessment, sensor fusion, and anomaly detection report produced by Agent 7.",
+  "type": "object",
+  "properties": {
+    "health": {
+      "type": "string",
+      "enum": ["HEALTHY", "DEGRADED", "WARNING", "CRITICAL", "OFFLINE"],
+      "description": "Authoritative observatory health state classification"
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Composite health score from 0 (failed) to 100 (optimal)"
+    },
+    "anomalies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sensor": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "OUT_OF_RANGE",
+              "STUCK_STALE",
+              "SPIKE",
+              "DRIFT",
+              "CROSS_SENSOR_INCONSISTENCY",
+              "DROPOUT_DISCONNECTED",
+              "COMMS_ANOMALY",
+              "ACTUATOR_ANOMALY",
+              "NOISE_VARIANCE"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+          },
+          "description": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "metric_name": { "type": "string" },
+          "observed_value": { "type": "number" },
+          "expected_range": {
+            "type": "array",
+            "items": { "type": "number" }
+          },
+          "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["sensor", "type", "severity", "description"]
+      },
+      "description": "List of active detected anomalies"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Composite sensory confidence score"
+    },
+    "sensor_confidences": {
+      "type": "object",
+      "description": "Mapping of individual sensor keys to confidence scores (0.0 to 1.0)"
+    },
+    "fused_environment": {
+      "type": "object",
+      "properties": {
+        "temperature": { "type": "number" },
+        "temperature_uncertainty": { "type": "number" },
+        "humidity": { "type": "number" },
+        "humidity_uncertainty": { "type": "number" },
+        "pressure": { "type": "number" },
+        "pressure_uncertainty": { "type": "number" },
+        "lux": { "type": "number" },
+        "lux_uncertainty": { "type": "number" },
+        "dew_point": { "type": "number" },
+        "vapor_pressure_deficit_kpa": { "type": "number" },
+        "rain_confirmed": { "type": "boolean" },
+        "primary_temp_source": { "type": "string" }
+      },
+      "required": ["temperature", "humidity", "pressure", "lux", "dew_point", "rain_confirmed"]
+    },
+    "actuator_health": {
+      "type": "object",
+      "properties": {
+        "pan_healthy": { "type": "boolean" },
+        "tilt_healthy": { "type": "boolean" },
+        "pan_tracking_error_deg": { "type": "number" },
+        "tilt_tracking_error_deg": { "type": "number" },
+        "slew_in_progress": { "type": "boolean" },
+        "stall_suspected": { "type": "boolean" },
+        "jitter_score": { "type": "number" }
+      },
+      "required": ["pan_healthy", "tilt_healthy", "stall_suspected"]
+    },
+    "comms_health": {
+      "type": "object",
+      "properties": {
+        "freshness_seconds": { "type": "number" },
+        "packet_jitter_seconds": { "type": "number" },
+        "rssi_dbm": { "type": "integer" },
+        "rssi_quality": { "type": "string" },
+        "dropout_count": { "type": "integer" },
+        "heartbeat_stalled": { "type": "boolean" }
+      },
+      "required": ["freshness_seconds", "heartbeat_stalled"]
+    },
+    "degraded_recommendation": {
+      "type": "string",
+      "enum": [
+        "NORMAL_OPERATION",
+        "USE_BMP280_TEMPERATURE",
+        "USE_DHT22_TEMPERATURE",
+        "INFER_HUMIDITY_FROM_HISTORY",
+        "INFER_PRESSURE_FROM_HISTORY",
+        "OPTICAL_CONFIRMATION_REQUIRED",
+        "REDUCED_SLEW_VELOCITY",
+        "SAFE_STOW_RECOMMENDED",
+        "COMMS_FAILSAFE_RECOMMENDED"
+      ]
+    },
+    "root_cause_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "anomaly_id": { "type": "string" },
+          "suspected_component": { "type": "string" },
+          "root_cause": { "type": "string" },
+          "confidence": { "type": "number" },
+          "evidence_metrics": { "type": "object" },
+          "recommended_action": { "type": "string" }
+        },
+        "required": ["anomaly_id", "suspected_component", "root_cause", "confidence", "recommended_action"]
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "health",
+    "score",
+    "anomalies",
+    "confidence",
+    "fused_environment",
+    "actuator_health",
+    "comms_health",
+    "timestamp"
+  ]
+}
