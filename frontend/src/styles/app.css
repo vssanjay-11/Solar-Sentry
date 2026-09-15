@@ -1,4 +1,5 @@
 @import './design-tokens.css';
+@import './v0-styles.css';
 
 /* Global Reset & Base */
 *, *::before, *::after {

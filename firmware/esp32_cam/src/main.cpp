@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESPmDNS.h>
 #include "esp_camera.h"
 
 /**
@@ -75,6 +76,29 @@ void handleCapture() {
     esp_camera_fb_return(fb);
 }
 
+void handleStream() {
+    if (!cameraInitialized) {
+        server.send(503, "application/json", "{\"error\":\"Camera sensor not initialized\"}");
+        return;
+    }
+    WiFiClient client = server.client();
+    String response = "HTTP/1.1 200 OK\r\n";
+    response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n";
+    server.sendContent(response);
+
+    while (client.connected()) {
+        camera_fb_t* fb = esp_camera_fb_get();
+        if (!fb) {
+            break;
+        }
+        client.print("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + String(fb->len) + "\r\n\r\n");
+        client.write(fb->buf, fb->len);
+        client.print("\r\n");
+        esp_camera_fb_return(fb);
+        delay(66); // ~15 FPS
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     delay(500);
@@ -134,6 +158,10 @@ void setup() {
 
     if (WiFi.status() == WL_CONNECTED) {
         Serial.printf("\n[Cam] Wi-Fi connected! IP: %s\n", WiFi.localIP().toString().c_str());
+        if (MDNS.begin("solar-sentry-cam")) {
+            Serial.println("[Cam] mDNS responder started: http://solar-sentry-cam.local");
+            MDNS.addService("http", "tcp", 80);
+        }
     } else {
         Serial.println("\n[Cam] Wi-Fi connection timed out. Retrying in loop.");
     }
@@ -141,6 +169,7 @@ void setup() {
     // Register HTTP endpoints
     server.on("/status", HTTP_GET, handleStatus);
     server.on("/capture", HTTP_GET, handleCapture);
+    server.on("/stream", HTTP_GET, handleStream);
     server.begin();
     Serial.println("[Cam] HTTP server listening on port 80.");
 }

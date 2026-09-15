@@ -1,228 +1,430 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ObservatoryProvider, useObservatory } from './context/ObservatoryContext';
-import { Header } from './components/header/Header';
-import { SystemStatePanel } from './components/panels/SystemStatePanel';
-import { ReadinessGaugePanel } from './components/panels/ReadinessGaugePanel';
-import { EnvironmentPanel } from './components/panels/EnvironmentPanel';
-import { SensorHealthPanel } from './components/panels/SensorHealthPanel';
-import { ObservatoryHealthPanel } from './components/panels/ObservatoryHealthPanel';
-import { AnomalyAlertsPanel } from './components/panels/AnomalyAlertsPanel';
-import { SolarVisionPanel } from './components/panels/SolarVisionPanel';
-import { SolarAnalysisPanel } from './components/panels/SolarAnalysisPanel';
-import { PredictionPanel } from './components/panels/PredictionPanel';
-import { AIDecisionPanel } from './components/panels/AIDecisionPanel';
-import { MissionControlPanel } from './components/panels/MissionControlPanel';
-import { MissionTimelinePanel } from './components/panels/MissionTimelinePanel';
-import { DigitalTwinPanel } from './components/panels/DigitalTwinPanel';
-import { TelemetryGraphPanel } from './components/panels/TelemetryGraphPanel';
-import { MissionReplayPanel } from './components/panels/MissionReplayPanel';
-import { EventLogPanel } from './components/panels/EventLogPanel';
-import { CommandControlPanel } from './components/panels/CommandControlPanel';
-import { ExplainableAIModal } from './components/panels/ExplainableAIModal';
-import { CameraVisionDeck } from './components/panels/CameraVisionDeck';
 import { 
-  Compass, 
+  Home, 
+  Camera, 
+  Sun, 
+  Telescope, 
+  Orbit, 
+  Layers3, 
+  BrainCircuit, 
   Activity, 
-  Film, 
-  Brain, 
-  Terminal, 
+  Database, 
+  Settings,
+  Search, 
+  Wifi, 
+  Bell, 
+  Menu, 
+  X, 
   AlertOctagon, 
-  Check,
-  Camera,
-  ShieldAlert
+  Check, 
+  ShieldAlert, 
+  Sparkles 
 } from 'lucide-react';
+import { HomePage } from './components/pages/HomePage';
+import { CameraPage } from './components/pages/CameraPage';
+import { AnalysisPage } from './components/pages/AnalysisPage';
+import { ObservatoryPage } from './components/pages/ObservatoryPage';
+import { MissionsPage } from './components/pages/MissionsPage';
+import { DigitalTwinPage } from './components/pages/DigitalTwinPage';
+import { AIPage } from './components/pages/AIPage';
+import { HealthPage } from './components/pages/HealthPage';
+import { LogsPage } from './components/pages/LogsPage';
+import { SettingsPage } from './components/pages/SettingsPage';
+import { ExplainableAIModal } from './components/panels/ExplainableAIModal';
+import { ImageStage } from './components/pages/common/UIPrimitives';
 import './styles/app.css';
 
-type DashboardTab = 'OPERATIONS' | 'OPTICAL' | 'DIAGNOSTICS' | 'COGNITIVE' | 'REPLAY';
+type PageTab = 
+  | 'Home' 
+  | 'Live Camera' 
+  | 'Solar Analysis' 
+  | 'Observatory' 
+  | 'Missions' 
+  | 'Digital Twin' 
+  | 'AI Insights' 
+  | 'System Health' 
+  | 'Data Logs' 
+  | 'Settings';
+
+interface NavItem {
+  label: PageTab;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
+  imageClass: string;
+  tagline: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: 'Home', icon: Home, imageClass: 'environment-home', tagline: 'Real-time Autonomous Solar Observatory Platform' },
+  { label: 'Live Camera', icon: Camera, imageClass: 'environment-camera', tagline: 'High-Resolution Dynamic ESP32-CAM Optical Vision Stream' },
+  { label: 'Solar Analysis', icon: Sun, imageClass: 'environment-analysis', tagline: 'Computer Vision Segmentation & Solar Feature Analysis' },
+  { label: 'Observatory', icon: Telescope, imageClass: 'environment-observatory', tagline: 'Ground Observatory Instruments & Celestial Tracking' },
+  { label: 'Missions', icon: Orbit, imageClass: 'environment-missions', tagline: 'Orbital Trajectories & Autonomous Solar Tracking' },
+  { label: 'Digital Twin', icon: Layers3, imageClass: 'environment-twin', tagline: 'Dual-Axis Kinematics & 3D Heliophysics Simulation' },
+  { label: 'AI Insights', icon: BrainCircuit, imageClass: 'environment-ai', tagline: 'Agent 8 Cognitive Inferences & Explainable AI Traces' },
+  { label: 'System Health', icon: Activity, imageClass: 'environment-health', tagline: 'Real-Time Edge Subsystem Diagnostics & Watchdog' },
+  { label: 'Data Logs', icon: Database, imageClass: 'environment-logs', tagline: 'Persisted Telemetry History & System Audit Records' },
+  { label: 'Settings', icon: Settings, imageClass: 'environment-settings', tagline: 'Hardware Configuration, mDNS Discovery & System Settings' }
+];
 
 const DashboardMain: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<DashboardTab>('OPERATIONS');
+  const [activeTab, setActiveTab] = useState<PageTab>('Home');
+  const [search, setSearch] = useState<string>('');
+  const [notice, setNotice] = useState<string>('All systems nominal');
+  const [cameraOpen, setCameraOpen] = useState<boolean>(false);
   const [isXAIModalOpen, setIsXAIModalOpen] = useState<boolean>(false);
-  const { alerts, acknowledgeAlert, systemMode, isOnline } = useObservatory();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [pointer, setPointer] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString());
+  const [currentDate, setCurrentDate] = useState<string>(
+    new Date().toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+  );
 
+  const { 
+    systemMode, 
+    setSystemMode, 
+    isOnline, 
+    alerts, 
+    acknowledgeAlert, 
+    cameraState 
+  } = useObservatory();
 
-  // Filter critical alerts for top banner
+  // Pointer position for parallax
+  useEffect(() => {
+    const handlePointer = (event: PointerEvent) => {
+      setPointer({
+        x: (event.clientX / window.innerWidth - 0.5) * 2,
+        y: (event.clientY / window.innerHeight - 0.5) * 2
+      });
+    };
+    window.addEventListener('pointermove', handlePointer, { passive: true });
+    return () => window.removeEventListener('pointermove', handlePointer);
+  }, []);
+
+  // Live Clock
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString());
+      setCurrentDate(
+        new Date().toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+      );
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const announce = (message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice('All systems nominal'), 3200);
+  };
+
+  const currentNav = NAV_ITEMS.find((item) => item.label === activeTab) || NAV_ITEMS[0];
   const criticalAlert = alerts.find((a) => a.severity === 'CRITICAL');
+  const isHardwareOffline = systemMode === 'HARDWARE' && !isOnline;
 
   return (
-    <div className="app-container">
-      {/* Top Header */}
-      <Header />
+    <main 
+      className={`sentry-shell ${currentNav.imageClass}`}
+      style={{
+        '--pointer-x': `${pointer.x}`,
+        '--pointer-y': `${pointer.y}`
+      } as React.CSSProperties}
+    >
+      {/* 
+        Astronomical Space Backdrop 
+        - High-resolution photorealistic space images
+        - Animated nebula & stars drift
+        - ZERO astronaut visuals or classes
+      */}
+      <div className="space-backdrop" aria-hidden="true">
+        <div className="space-nebula" />
+        <div className="space-stars" />
+        <div className="space-orbit" />
+        <div className="space-dust" />
+      </div>
 
-      {/* Critical Floating Alert Banner */}
-      {criticalAlert && (
-        <div className="critical-alert-banner">
-          <div className="alert-message-content">
-            <AlertOctagon size={18} color="var(--status-red)" />
-            <span style={{ fontWeight: 800, color: 'var(--status-red)' }}>[CRITICAL SAFETY INTERLOCK]:</span>
-            <span style={{ color: 'var(--text-bright)' }}>{criticalAlert.message}</span>
+      {/* Left Navigation Sidebar */}
+      <aside className="sidebar">
+        <div className="brand-block">
+          <div className="brand-mark">
+            Solar <span>Sentry</span>
           </div>
-          <button
-            className="btn-ack"
-            onClick={() => acknowledgeAlert(criticalAlert.alert_id)}
-          >
-            <Check size={12} style={{ marginRight: '4px' }} />
-            ACKNOWLEDGE & DISMISS
-          </button>
+          <p>Observe <b>·</b> Protect <b>·</b> Explore</p>
         </div>
-      )}
 
-      {/* Navigation Tab Bar */}
-      <nav className="nav-tab-bar">
-        <button
-          className={`nav-tab ${activeTab === 'OPERATIONS' ? 'active' : ''}`}
-          onClick={() => setActiveTab('OPERATIONS')}
+        <button 
+          className="mobile-menu" 
+          aria-label="Toggle navigation menu"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
-          <Compass size={14} />
-          <span>MISSION OPERATIONS</span>
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
 
-        <button
-          className={`nav-tab ${activeTab === 'OPTICAL' ? 'active' : ''}`}
-          onClick={() => setActiveTab('OPTICAL')}
-        >
-          <Camera size={14} />
-          <span>OPTICAL & VISION</span>
-        </button>
+        <nav className={`primary-nav ${mobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Primary navigation">
+          {NAV_ITEMS.map(({ label, icon: IconComponent }) => (
+            <button
+              key={label}
+              className={`nav-item ${activeTab === label ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab(label);
+                setMobileMenuOpen(false);
+                announce(`${label} page selected`);
+              }}
+            >
+              <IconComponent size={17} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
 
-        <button
-          className={`nav-tab ${activeTab === 'DIAGNOSTICS' ? 'active' : ''}`}
-          onClick={() => setActiveTab('DIAGNOSTICS')}
-        >
-          <Activity size={14} />
-          <span>SENSORS & HEALTH</span>
-        </button>
+        <blockquote>
+          “Beyond our atmosphere lies a universe of possibilities.”
+        </blockquote>
+      </aside>
 
-        <button
-          className={`nav-tab ${activeTab === 'COGNITIVE' ? 'active' : ''}`}
-          onClick={() => setActiveTab('COGNITIVE')}
-        >
-          <Brain size={14} />
-          <span>COGNITIVE AI & PREDICTIONS</span>
-        </button>
+      {/* Main Dashboard Content Area */}
+      <div className="dashboard-content">
+        {/* Top Header Bar */}
+        <header className="topbar">
+          <label className="search-box">
+            <Search />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${activeTab.toLowerCase()}, missions, telemetry...`}
+            />
+          </label>
 
-        <button
-          className={`nav-tab ${activeTab === 'REPLAY' ? 'active' : ''}`}
-          onClick={() => setActiveTab('REPLAY')}
-        >
-          <Film size={14} />
-          <span>SESSION REPLAY & AUDIT LOG</span>
-        </button>
-      </nav>
-
-      {/* Persistent Hardware Offline Notice when in HARDWARE mode */}
-      {systemMode === 'HARDWARE' && !isOnline && (
-        <div style={{
-          margin: '0 20px 12px 20px',
-          background: 'rgba(255, 77, 77, 0.12)',
-          border: '1px solid var(--red-alert)',
-          borderRadius: '6px',
-          padding: '10px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          fontSize: '0.82rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShieldAlert size={18} style={{ color: 'var(--red-alert)', flexShrink: 0 }} />
-            <div>
-              <strong style={{ color: 'var(--red-alert)' }}>LIVE HARDWARE MODE — ESP32 DEVICE OFFLINE:</strong> Real telemetry & camera feed are awaiting physical ESP32 connection. Data fabrication is strictly disabled in hardware mode.
-            </div>
+          <div className="date-readout">
+            <span>{currentDate}</span>
+            <span>{currentTime}</span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Switch to <strong>DEMO</strong> in the top header to run autonomous simulations.
+
+          {/* Mode Switch (DEMO vs HARDWARE) */}
+          <div className="mode-switch">
+            {(['DEMO', 'HARDWARE'] as const).map((mode) => (
+              <button
+                key={mode}
+                className={`${systemMode === mode ? 'selected' : ''} ${systemMode === 'DEMO' && mode === 'DEMO' ? 'demo-selected' : ''}`}
+                onClick={async () => {
+                  await setSystemMode(mode);
+                  announce(`${mode} mode activated`);
+                }}
+              >
+                {mode === 'HARDWARE' && <span className="toggle-dot" />}
+                {mode}
+              </button>
+            ))}
+          </div>
+
+          <span title="Observatory Network Mesh Online" style={{ display: 'flex', alignItems: 'center' }}>
+            <Wifi className="wifi-icon" />
           </span>
-        </div>
-      )}
 
-      {/* Main Content Area */}
-      <main className="dashboard-content">
-        {activeTab === 'OPTICAL' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <CameraVisionDeck />
-            <div className="grid-bottom-row">
-              <SolarAnalysisPanel />
-              <DigitalTwinPanel />
+          {/* System Status Button */}
+          <button 
+            className="system-status"
+            onClick={() => {
+              announce('Running immediate system diagnostic...');
+              setActiveTab('System Health');
+            }}
+          >
+            <span className={`status-dot ${isHardwareOffline ? 'offline' : ''}`} />
+            <span>
+              <strong>
+                {systemMode === 'DEMO' 
+                  ? 'Demo Simulation' 
+                  : (isHardwareOffline ? 'Hardware Offline' : 'Hardware Online')}
+              </strong>
+              <small>{notice}</small>
+            </span>
+            <Bell />
+          </button>
+        </header>
+
+        {/* Critical Safety Interlock Banner */}
+        {criticalAlert && (
+          <div className="critical-alert-banner" style={{
+            margin: '12px 0 0',
+            padding: '10px 14px',
+            background: 'rgba(255, 77, 77, 0.16)',
+            border: '1px solid var(--v0-red)',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--v0-red)', fontSize: '12px' }}>
+              <AlertOctagon size={18} />
+              <strong>[CRITICAL SAFETY INTERLOCK]:</strong>
+              <span style={{ color: '#fff' }}>{criticalAlert.message}</span>
             </div>
+            <button
+              onClick={() => acknowledgeAlert(criticalAlert.alert_id)}
+              style={{
+                background: 'var(--v0-red)',
+                border: 0,
+                color: '#fff',
+                borderRadius: '4px',
+                padding: '4px 10px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Check size={12} /> Acknowledge
+            </button>
           </div>
         )}
 
-        {activeTab === 'OPERATIONS' && (
-
-          <>
-            {/* Top Row: Core State, ORS Gauge, Microclimate, AI Decision */}
-            <div className="grid-top-row">
-              <SystemStatePanel />
-              <ReadinessGaugePanel />
-              <EnvironmentPanel />
-              <AIDecisionPanel onOpenXAIModal={() => setIsXAIModalOpen(true)} />
+        {/* Persistent Hardware Offline Notice in HARDWARE mode */}
+        {isHardwareOffline && (
+          <div style={{
+            marginTop: '12px',
+            background: 'rgba(255, 77, 77, 0.12)',
+            border: '1px solid var(--v0-red)',
+            borderRadius: '8px',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            fontSize: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <ShieldAlert size={18} style={{ color: 'var(--v0-red)', flexShrink: 0 }} />
+              <div>
+                <strong style={{ color: 'var(--v0-red)' }}>LIVE HARDWARE MODE — ESP32 DEVICE OFFLINE:</strong> Awaiting physical ESP32 controller connection on local network/serial port. Data fabrication is strictly prohibited.
+              </div>
             </div>
-
-            {/* Middle Row: Digital Twin (kinematics), Vision Feed (ESP32-CAM), Mission Control */}
-            <div className="grid-middle-row">
-              <DigitalTwinPanel />
-              <SolarVisionPanel />
-              <MissionControlPanel />
-            </div>
-
-            {/* Bottom Row: Historical Telemetry Graph, Actuator Jog/Flight Controls */}
-            <div className="grid-bottom-row">
-              <TelemetryGraphPanel />
-              <CommandControlPanel />
-            </div>
-          </>
+            <button
+              onClick={() => setSystemMode('DEMO')}
+              style={{
+                background: 'rgba(255, 185, 28, 0.25)',
+                border: '1px solid var(--v0-gold)',
+                color: '#ffda6a',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Switch to DEMO MODE
+            </button>
+          </div>
         )}
 
-        {activeTab === 'DIAGNOSTICS' && (
-          <>
-            <div className="grid-top-row">
-              <SystemStatePanel />
-              <ObservatoryHealthPanel />
-              <SensorHealthPanel />
-              <AnomalyAlertsPanel />
-            </div>
+        {/* Page Heading Section */}
+        <section className="page-heading">
+          <div>
+            <p className="kicker">Solar Sentry Observatory</p>
+            <h1>{activeTab}</h1>
+            <p>{currentNav.tagline}</p>
+          </div>
+          <div className="hero-quote">
+            <em>Observe the Sun today</em><br />
+            <strong>for a safer tomorrow.</strong>
+          </div>
+        </section>
 
-            <div className="grid-bottom-row">
-              <EnvironmentPanel />
-              <CommandControlPanel />
-            </div>
-          </>
+        {/* 10 Individual Page Views */}
+        {activeTab === 'Home' && (
+          <HomePage 
+            announce={announce} 
+            onNavigateToTab={(tab) => setActiveTab(tab as PageTab)} 
+          />
+        )}
+        {activeTab === 'Live Camera' && (
+          <CameraPage 
+            announce={announce} 
+            setCameraOpen={setCameraOpen} 
+          />
+        )}
+        {activeTab === 'Solar Analysis' && (
+          <AnalysisPage 
+            announce={announce} 
+            onOpenReport={() => setIsXAIModalOpen(true)} 
+          />
+        )}
+        {activeTab === 'Observatory' && (
+          <ObservatoryPage 
+            announce={announce} 
+          />
+        )}
+        {activeTab === 'Missions' && (
+          <MissionsPage 
+            announce={announce} 
+            filtered={search ? [search] : undefined} 
+          />
+        )}
+        {activeTab === 'Digital Twin' && (
+          <DigitalTwinPage 
+            announce={announce} 
+          />
+        )}
+        {activeTab === 'AI Insights' && (
+          <AIPage 
+            announce={announce} 
+            onOpenXAIModal={() => setIsXAIModalOpen(true)} 
+          />
+        )}
+        {activeTab === 'System Health' && (
+          <HealthPage 
+            announce={announce} 
+          />
+        )}
+        {activeTab === 'Data Logs' && (
+          <LogsPage 
+            announce={announce} 
+          />
+        )}
+        {activeTab === 'Settings' && (
+          <SettingsPage 
+            announce={announce} 
+          />
         )}
 
-        {activeTab === 'COGNITIVE' && (
-          <>
-            <div className="grid-top-row">
-              <ReadinessGaugePanel />
-              <AIDecisionPanel onOpenXAIModal={() => setIsXAIModalOpen(true)} />
-              <PredictionPanel />
-              <SolarAnalysisPanel />
-            </div>
+        {/* Global Footer */}
+        <footer className="dashboard-footer">
+          <span />
+          Solar Sentry · Observe. Protect. Explore.
+          <span />
+        </footer>
+      </div>
 
-            <div className="grid-bottom-row">
-              <SolarVisionPanel />
-              <MissionTimelinePanel />
+      {/* Full-Screen Camera Modal */}
+      {cameraOpen && (
+        <div className="modal-backdrop" onClick={() => setCameraOpen(false)}>
+          <div className="camera-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="panel-heading">
+              <h2>Live Camera Feed (Full Resolution)</h2>
+              <button onClick={() => setCameraOpen(false)} aria-label="Close modal">
+                <X size={20} />
+              </button>
             </div>
-          </>
-        )}
-
-        {activeTab === 'REPLAY' && (
-          <>
-            <MissionReplayPanel />
-            <div className="grid-bottom-row">
-              <TelemetryGraphPanel />
-              <EventLogPanel />
-            </div>
-          </>
-        )}
-      </main>
+            <img 
+              src={cameraState.status === 'ONLINE' ? cameraState.streamUrl : '/space/live-camera.jpg'} 
+              alt="Live Solar Camera Full Feed" 
+            />
+            <p>
+              <span>Solar Sentry CAM-01 ({cameraState.hostname})</span>
+              <span className="live-label">
+                <span className={`status-dot ${cameraState.status !== 'ONLINE' ? 'offline' : ''}`} />
+                {cameraState.status}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Explainable AI Modal */}
       <ExplainableAIModal
         isOpen={isXAIModalOpen}
         onClose={() => setIsXAIModalOpen(false)}
       />
-    </div>
+    </main>
   );
 };
 

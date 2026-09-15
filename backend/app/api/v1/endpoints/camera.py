@@ -3,11 +3,13 @@ Solar Sentry — Camera / Optical Vision API Endpoints
 Module: Agent 1 (ESP32-CAM), Agent 2 (Backend API), Agent 5 (Computer Vision)
 """
 
+import asyncio
 import base64
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
+from app.core.logging import logger
 from app.core.providers import provider_manager, SystemMode
 from app.services.camera_calibration import (
     CameraCalibrationService,
@@ -43,23 +45,85 @@ class CalibrationRequest(BaseModel):
     rotation_deg: int = Field(default=0)
 
 
+from fastapi.responses import StreamingResponse
+from app.services.camera_discovery import camera_registry
+
+
 @router.get("/status", summary="Get camera connection state and metadata")
 async def get_camera_status() -> Dict[str, Any]:
     status_info = await provider_manager.camera_provider.get_status()
+    reg_info = camera_registry.get_info()
     status_info["system_mode"] = provider_manager.mode.value
     status_info["configured_url"] = provider_manager.camera_url
+    status_info["registry"] = reg_info
+    status_info["discovered_ip"] = reg_info.get("ip")
+    status_info["hostname"] = reg_info.get("hostname")
+    status_info["discovery_status"] = reg_info.get("status")
+    status_info["discovery_method"] = reg_info.get("discovery_method")
+    status_info["stream_url"] = "/api/v1/camera/stream"
     return status_info
+
+
+@router.get("/discover", summary="Trigger dynamic mDNS / network discovery of ESP32-CAM")
+async def discover_camera(fallback_ip: Optional[str] = Query(default=None)) -> Dict[str, Any]:
+    return await camera_registry.discover(fallback_ip=fallback_ip)
+
+
+@router.get("/stream", summary="Live MJPEG video stream with dynamic camera proxying")
+async def get_live_stream() -> StreamingResponse:
+    async def frame_generator():
+        while True:
+            try:
+                if provider_manager.mode == SystemMode.DEMO:
+                    frame_bytes = await provider_manager.demo_camera.capture_raw_frame()
+                    yield (
+                        b"--frame\r\n"
+                        b"Content-Type: image/jpeg\r\n"
+                        b"Content-Length: " + str(len(frame_bytes)).encode("ascii") + b"\r\n\r\n" +
+                        frame_bytes + b"\r\n"
+                    )
+                    await asyncio.sleep(0.08)  # ~12 FPS
+                else:
+                    # In HARDWARE mode
+                    if camera_registry.status != "ONLINE":
+                        await camera_registry.discover()
+
+                    if camera_registry.status == "ONLINE" and camera_registry.current_ip:
+                        try:
+                            frame_bytes = await provider_manager.esp32_camera.capture_raw_frame()
+                            yield (
+                                b"--frame\r\n"
+                                b"Content-Type: image/jpeg\r\n"
+                                b"Content-Length: " + str(len(frame_bytes)).encode("ascii") + b"\r\n\r\n" +
+                                frame_bytes + b"\r\n"
+                            )
+                            await asyncio.sleep(0.066)  # ~15 FPS
+                        except Exception as e:
+                            logger.warning(f"Hardware camera frame fetch failed: {e}. Attempting rediscovery...")
+                            await camera_registry.discover()
+                            await asyncio.sleep(1.0)
+                    else:
+                        await asyncio.sleep(1.0)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Stream generator error: {e}")
+                await asyncio.sleep(1.0)
+
+    return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @router.post("/config", summary="Configure and validate ESP32-CAM target URL")
 async def configure_camera_url(payload: CameraConfigPayload) -> Dict[str, Any]:
     url = provider_manager.set_camera_url(payload.esp32_cam_url)
-    # Perform immediate test
+    host = payload.esp32_cam_url.replace("http://", "").replace("https://", "").split(":")[0]
+    await camera_registry.discover(fallback_ip=host)
     test_res = await provider_manager.esp32_camera.test_connection()
     return {
         "status": "CONFIGURED",
         "camera_url": url,
-        "test_result": test_res
+        "test_result": test_res,
+        "registry": camera_registry.get_info()
     }
 
 

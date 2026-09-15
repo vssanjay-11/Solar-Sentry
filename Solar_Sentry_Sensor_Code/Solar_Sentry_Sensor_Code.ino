@@ -1,6 +1,6 @@
 /*
    ================================================================
-                    SOLAR-SENTRY ΩX
+                    SOLAR-SENTRY
    Autonomous Cognitive Solar Observatory
    ---------------------------------------------------------------
    ESP32 EDGE OBSERVATORY CONTROLLER
@@ -67,7 +67,7 @@
 // ================================================================
 
 // ---------- Wi-Fi ----------
-const char* WIFI_SSID     = "Realme GT 6T 2";
+const char* WIFI_SSID     = "Rea";
 const char* WIFI_PASSWORD = "vssanjay11";
 
 // ---------- AI Backend ----------
@@ -298,7 +298,7 @@ void setup()
   Serial.println();
   Serial.println();
   Serial.println("================================================");
-  Serial.println("             SOLAR-SENTRY ΩX");
+  Serial.println("             SOLAR-SENTRY   ");
   Serial.println(" AUTONOMOUS COGNITIVE SOLAR OBSERVATORY");
   Serial.println("          EDGE CONTROLLER v1.0");
   Serial.println("================================================");

@@ -55,6 +55,19 @@ interface ObservatoryContextType {
   setIsReplayPlaying: (playing: boolean) => void;
   replaySpeed: number;
   setReplaySpeed: (speed: number) => void;
+
+  // Camera & Stream
+  cameraState: {
+    status: 'ONLINE' | 'OFFLINE' | 'DISCOVERING' | 'RECONNECTING' | 'DEGRADED';
+    ip: string;
+    hostname: string;
+    streamUrl: string;
+    latencyMs: number;
+    discoveryMethod: string;
+    isVerified: boolean;
+  };
+  rediscoverCamera: () => Promise<void>;
+  updateCameraUrl: (url: string) => Promise<void>;
 }
 
 const ObservatoryContext = createContext<ObservatoryContextType | undefined>(undefined);
@@ -86,21 +99,104 @@ export const ObservatoryProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, []);
 
-  // Poll hardware status when in HARDWARE mode
+  // Camera State & Discovery
+  const [cameraState, setCameraState] = useState<{
+    status: 'ONLINE' | 'OFFLINE' | 'DISCOVERING' | 'RECONNECTING' | 'DEGRADED';
+    ip: string;
+    hostname: string;
+    streamUrl: string;
+    latencyMs: number;
+    discoveryMethod: string;
+    isVerified: boolean;
+  }>({
+    status: 'ONLINE',
+    ip: '127.0.0.1 (simulated)',
+    hostname: 'solar-sentry-cam.local',
+    streamUrl: observatoryApi.getCameraStreamUrl(),
+    latencyMs: 12,
+    discoveryMethod: 'demo',
+    isVerified: true,
+  });
+
+  const rediscoverCamera = useCallback(async () => {
+    setCameraState((prev) => ({ ...prev, status: 'DISCOVERING' }));
+    try {
+      const res = await observatoryApi.discoverCamera();
+      if (res && (res.status === 'ONLINE' || res.ip)) {
+        setCameraState({
+          status: 'ONLINE',
+          ip: res.ip || '',
+          hostname: res.hostname || 'solar-sentry-cam.local',
+          streamUrl: observatoryApi.getCameraStreamUrl(),
+          latencyMs: res.latency_ms || 45,
+          discoveryMethod: res.discovery_method || 'mdns',
+          isVerified: true,
+        });
+      } else {
+        setCameraState((prev) => ({
+          ...prev,
+          status: 'OFFLINE',
+          isVerified: false,
+        }));
+      }
+    } catch (e) {
+      console.warn('Camera rediscovery error:', e);
+      setCameraState((prev) => ({ ...prev, status: 'OFFLINE', isVerified: false }));
+    }
+  }, []);
+
+  const updateCameraUrl = useCallback(async (url: string) => {
+    try {
+      await observatoryApi.configureCameraUrl(url);
+      await rediscoverCamera();
+    } catch (e) {
+      console.error('Failed to configure camera url:', e);
+    }
+  }, [rediscoverCamera]);
+
+  // Periodic Camera status sync based on system mode
   useEffect(() => {
-    if (systemMode !== 'HARDWARE') return;
-    const checkStatus = async () => {
+    if (systemMode === 'DEMO') {
+      setCameraState({
+        status: 'ONLINE',
+        ip: '127.0.0.1 (simulated)',
+        hostname: 'solar-sentry-cam.local',
+        streamUrl: observatoryApi.getCameraStreamUrl(),
+        latencyMs: 10,
+        discoveryMethod: 'demo',
+        isVerified: true,
+      });
+      return;
+    }
+
+    const pollCamera = async () => {
       try {
-        const st = await observatoryApi.getSystemStatus();
-        setIsOnline(st.device_connected);
+        const data = await observatoryApi.getCameraStatus();
+        const reg = data.registry || {};
+        const isCamOnline = data.connected || reg.status === 'ONLINE';
+        setCameraState({
+          status: isCamOnline ? 'ONLINE' : (reg.status === 'DISCOVERING' ? 'DISCOVERING' : 'OFFLINE'),
+          ip: data.discovered_ip || reg.ip || '',
+          hostname: data.hostname || reg.hostname || 'solar-sentry-cam.local',
+          streamUrl: observatoryApi.getCameraStreamUrl(),
+          latencyMs: data.latency_ms || (isCamOnline ? 42 : 0),
+          discoveryMethod: data.discovery_method || reg.discovery_method || 'mdns',
+          isVerified: isCamOnline,
+        });
       } catch {
-        setIsOnline(false);
+        setCameraState((prev) => ({
+          ...prev,
+          status: 'OFFLINE',
+          isVerified: false,
+        }));
       }
     };
-    checkStatus();
-    const interval = setInterval(checkStatus, 3000);
+
+    pollCamera();
+    const interval = setInterval(pollCamera, 4000);
     return () => clearInterval(interval);
   }, [systemMode]);
+
 
 
   // Initialize initial simulator data
@@ -392,6 +488,9 @@ export const ObservatoryProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setIsReplayPlaying,
         replaySpeed,
         setReplaySpeed,
+        cameraState,
+        rediscoverCamera,
+        updateCameraUrl,
       }}
     >
       {children}

@@ -137,6 +137,17 @@ export class ObservatoryApiClient {
     if (!res.ok) throw new Error(`HTTP ${res.status}: Camera URL config failed`);
     return res.json();
   }
+
+  async discoverCamera(fallbackIp?: string): Promise<any> {
+    const query = fallbackIp ? `?fallback_ip=${encodeURIComponent(fallbackIp)}` : '';
+    const res = await fetch(`${this.baseUrl}/camera/discover${query}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: Camera discovery failed`);
+    return res.json();
+  }
+
+  getCameraStreamUrl(): string {
+    return `${this.baseUrl}/camera/stream`;
+  }
 }
 
 export const observatoryApi = new ObservatoryApiClient();
