@@ -8,7 +8,12 @@ export type CommandVerb =
   | 'SET_STATE'
   | 'REBOOT'
   | 'CALIBRATE'
-  | 'EMERGENCY_STOP';
+  | 'EMERGENCY_STOP'
+  | 'PAN_LEFT'
+  | 'PAN_RIGHT'
+  | 'TILT_UP'
+  | 'TILT_DOWN'
+  | 'CENTER';
 
 export interface CommandPayload {
   command_id: string;

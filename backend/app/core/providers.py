@@ -345,27 +345,45 @@ class DemoActuatorProvider(ActuatorProvider):
 
     def __init__(self):
         self.pan = 90
-        self.tilt = 45
+        self.tilt = 90
         self.state = DeviceState.STANDBY
 
     async def execute_command(self, command: Command) -> CommandResult:
-        # Software limits check
-        if command.pan is not None and command.pan >= 0:
-            self.pan = max(0, min(180, command.pan))
-        if command.tilt is not None and command.tilt >= 0:
-            self.tilt = max(0, min(180, command.tilt))
+        verb = command.command.value if hasattr(command.command, "value") else str(command.command)
 
-        if command.command == "PARK":
+        # Handle direct jog verbs
+        if verb == "PAN_LEFT":
+            self.pan = max(20, self.pan - 10)
+        elif verb == "PAN_RIGHT":
+            self.pan = min(160, self.pan + 10)
+        elif verb == "TILT_UP":
+            self.tilt = min(150, self.tilt + 10)
+        elif verb == "TILT_DOWN":
+            self.tilt = max(30, self.tilt - 10)
+        elif verb == "CENTER":
             self.pan = 90
-            self.tilt = 0
+            self.tilt = 90
+        elif verb == "PARK" or verb == "SAFE":
+            self.pan = 90
+            self.tilt = 30
             self.state = DeviceState.SAFE
-        elif command.command == "OBSERVE":
+        elif verb == "OBSERVE":
             self.state = DeviceState.OBSERVE
-        elif command.command == "SET_STATE" and command.target_state:
+        elif verb == "SET_SERVO":
+            if command.pan is not None:
+                self.pan = max(20, min(160, command.pan))
+            if command.tilt is not None:
+                self.tilt = max(30, min(150, command.tilt))
+        elif verb == "SET_STATE" and command.target_state:
             try:
                 self.state = DeviceState(command.target_state)
             except ValueError:
                 pass
+
+        if command.pan is not None and verb != "SET_SERVO":
+            self.pan = max(20, min(160, command.pan))
+        if command.tilt is not None and verb != "SET_SERVO":
+            self.tilt = max(30, min(150, command.tilt))
 
         return CommandResult(
             command_id=command.command_id,
@@ -397,26 +415,43 @@ class ESP32ActuatorProvider(ActuatorProvider):
     async def execute_command(self, command: Command) -> CommandResult:
         # If ESP32 is polling commands via HTTP, enqueue it
         self.queue_for_poll(command)
+
+        # Build list of serial lines to send
+        lines_to_send = []
+        verb = command.command.value if hasattr(command.command, "value") else str(command.command)
+
+        if verb == "SET_SERVO":
+            if command.pan is not None:
+                lines_to_send.append(f"PAN:{int(command.pan)}")
+            if command.tilt is not None:
+                lines_to_send.append(f"TILT:{int(command.tilt)}")
+        elif verb in ["PAN_LEFT", "PAN_RIGHT", "TILT_UP", "TILT_DOWN", "CENTER", "OBSERVE", "WAIT", "SUSPEND", "SCAN", "SAFE", "PARK"]:
+            lines_to_send.append(verb)
+        else:
+            lines_to_send.append(verb)
+
         dispatched_serial = False
         try:
             from app.services.serial_reader import serial_reader
             if serial_reader.is_connected:
-                dispatched_serial = await serial_reader.send_command(command.command)
+                for line in lines_to_send:
+                    await serial_reader.send_command(line)
+                dispatched_serial = True
         except Exception as e:
             logger.debug(f"Serial command dispatch notice: {e}")
 
         msg = (
-            "Command dispatched immediately via USB Serial to ESP32."
+            f"Command '{verb}' dispatched immediately via USB Serial to ESP32."
             if dispatched_serial else
-            "Command queued for physical ESP32 edge polling dispatch."
+            f"Command '{verb}' queued for physical ESP32 edge polling dispatch."
         )
         return CommandResult(
             command_id=command.command_id,
             status=CommandStatus.SUCCESS if dispatched_serial else CommandStatus.EXECUTING,
             message=msg,
             current_pan=command.pan if command.pan is not None else 90,
-            current_tilt=command.tilt if command.tilt is not None else 0,
-            current_state=DeviceState.OBSERVE if command.command == "OBSERVE" else DeviceState.STANDBY,
+            current_tilt=command.tilt if command.tilt is not None else 90,
+            current_state=DeviceState.OBSERVE if verb == "OBSERVE" else DeviceState.STANDBY,
             timestamp=datetime.now(timezone.utc).isoformat()
         )
 

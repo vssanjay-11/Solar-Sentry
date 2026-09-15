@@ -13,6 +13,11 @@ class CommandVerb(str, Enum):
     REBOOT = "REBOOT"
     CALIBRATE = "CALIBRATE"
     EMERGENCY_STOP = "EMERGENCY_STOP"
+    PAN_LEFT = "PAN_LEFT"
+    PAN_RIGHT = "PAN_RIGHT"
+    TILT_UP = "TILT_UP"
+    TILT_DOWN = "TILT_DOWN"
+    CENTER = "CENTER"
 
 
 class TargetState(str, Enum):

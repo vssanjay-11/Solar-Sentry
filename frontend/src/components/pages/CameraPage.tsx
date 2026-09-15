@@ -13,7 +13,13 @@ import {
   Wifi,
   CheckCircle,
   AlertCircle,
-  Sliders
+  Sliders,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Compass,
+  Target
 } from 'lucide-react';
 import { useObservatory } from '../../context/ObservatoryContext';
 import { observatoryApi } from '../../services/api';
@@ -25,7 +31,11 @@ interface CameraPageProps {
 }
 
 export const CameraPage: React.FC<CameraPageProps> = ({ announce, setCameraOpen }) => {
-  const { cameraState, rediscoverCamera, systemMode } = useObservatory();
+  const { cameraState, rediscoverCamera, systemMode, telemetry, sendCommand } = useObservatory();
+
+  const [targetPan, setTargetPan] = useState<number>(telemetry.pan || 90);
+  const [targetTilt, setTargetTilt] = useState<number>(telemetry.tilt || 90);
+  const [isJogging, setIsJogging] = useState<boolean>(false);
 
   const [brightness, setBrightness] = useState<number>(0);
   const [contrast, setContrast] = useState<number>(1.2);
@@ -88,6 +98,41 @@ export const CameraPage: React.FC<CameraPageProps> = ({ announce, setCameraOpen 
       announce('Optical calibration parameters applied to vision pipeline');
     } catch {
       announce('Calibration applied');
+    }
+  };
+
+  const handleJog = async (direction: 'PAN_LEFT' | 'PAN_RIGHT' | 'TILT_UP' | 'TILT_DOWN') => {
+    setIsJogging(true);
+    try {
+      await sendCommand(direction);
+      announce(`Gimbal jogged ${direction.replace('_', ' ')}`);
+    } catch (err: any) {
+      announce(`Jog error: ${err.message || 'Error'}`);
+    } finally {
+      setIsJogging(false);
+    }
+  };
+
+  const handleCenter = async () => {
+    setIsJogging(true);
+    try {
+      setTargetPan(90);
+      setTargetTilt(90);
+      await sendCommand('SET_SERVO', { pan: 90, tilt: 90 });
+      announce('Gimbal centered to (90°, 90°)');
+    } finally {
+      setIsJogging(false);
+    }
+  };
+
+  const handleSetServo = async (p: number, t: number) => {
+    setTargetPan(p);
+    setTargetTilt(t);
+    try {
+      await sendCommand('SET_SERVO', { pan: p, tilt: t });
+      announce(`Gimbal set to Pan ${p}° · Tilt ${t}°`);
+    } catch (err: any) {
+      announce(`Servo slew error: ${err.message || 'Error'}`);
     }
   };
 
@@ -197,6 +242,174 @@ export const CameraPage: React.FC<CameraPageProps> = ({ announce, setCameraOpen 
 
         {/* Right Column: Camera Diagnostics & Controls */}
         <div className="stack">
+          {/* Dual-Axis Servo Pan & Tilt Control Deck */}
+          <Panel
+            title="ESP32 Dual-Axis Gimbal Control (Pan & Tilt)"
+            icon={Compass}
+            action={
+              <span className="live-label" style={{ color: '#17befe', background: 'rgba(23, 190, 254, 0.1)', border: '1px solid rgba(23, 190, 254, 0.3)' }}>
+                <span className="status-dot" style={{ background: '#17befe' }} />
+                PAN {telemetry.pan}° · TILT {telemetry.tilt}°
+              </span>
+            }
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '10px' }}>
+              {/* Directional D-Pad & Angle Display */}
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 40px)',
+                  gridTemplateRows: 'repeat(3, 40px)',
+                  gap: '5px',
+                  background: 'rgba(3, 16, 36, 0.8)',
+                  padding: '8px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(33, 170, 255, 0.3)'
+                }}>
+                  <div />
+                  <button
+                    className="primary-action"
+                    onClick={() => handleJog('TILT_UP')}
+                    disabled={isJogging}
+                    title="Tilt Up (+10°)"
+                    style={{ width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                  >
+                    <ChevronUp size={20} />
+                  </button>
+                  <div />
+
+                  <button
+                    className="primary-action"
+                    onClick={() => handleJog('PAN_LEFT')}
+                    disabled={isJogging}
+                    title="Pan Left (-10°)"
+                    style={{ width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    onClick={handleCenter}
+                    disabled={isJogging}
+                    title="Center Gimbal (90°, 90°)"
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '6px',
+                      background: 'rgba(23, 190, 254, 0.2)',
+                      border: '1px solid rgba(23, 190, 254, 0.5)',
+                      color: '#17befe',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Target size={16} />
+                  </button>
+                  <button
+                    className="primary-action"
+                    onClick={() => handleJog('PAN_RIGHT')}
+                    disabled={isJogging}
+                    title="Pan Right (+10°)"
+                    style={{ width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+
+                  <div />
+                  <button
+                    className="primary-action"
+                    onClick={() => handleJog('TILT_DOWN')}
+                    disabled={isJogging}
+                    title="Tilt Down (-10°)"
+                    style={{ width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px' }}
+                  >
+                    <ChevronDown size={20} />
+                  </button>
+                  <div />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '130px' }}>
+                  <div style={{ background: 'rgba(5, 24, 52, 0.6)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(33, 170, 255, 0.2)' }}>
+                    <div style={{ fontSize: '10px', color: '#7faad7' }}>Current Pan</div>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: '#17befe', fontFamily: 'var(--font-mono)' }}>{telemetry.pan}°</div>
+                  </div>
+                  <div style={{ background: 'rgba(5, 24, 52, 0.6)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(33, 170, 255, 0.2)' }}>
+                    <div style={{ fontSize: '10px', color: '#7faad7' }}>Current Tilt</div>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: '#f59e0b', fontFamily: 'var(--font-mono)' }}>{telemetry.tilt}°</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Angle Sliders */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px' }}>
+                    <span style={{ color: '#8dc5ff' }}>Pan Azimuth (20°–160°)</span>
+                    <strong style={{ color: '#fff' }}>{targetPan}°</strong>
+                  </div>
+                  <input
+                    type="range"
+                    min="20"
+                    max="160"
+                    step="1"
+                    value={targetPan}
+                    onChange={(e) => setTargetPan(Number(e.target.value))}
+                    onMouseUp={() => handleSetServo(targetPan, targetTilt)}
+                    onTouchEnd={() => handleSetServo(targetPan, targetTilt)}
+                    style={{ width: '100%', accentColor: '#17befe', cursor: 'pointer' }}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px' }}>
+                    <span style={{ color: '#8dc5ff' }}>Tilt Elevation (30°–150°)</span>
+                    <strong style={{ color: '#fff' }}>{targetTilt}°</strong>
+                  </div>
+                  <input
+                    type="range"
+                    min="30"
+                    max="150"
+                    step="1"
+                    value={targetTilt}
+                    onChange={(e) => setTargetTilt(Number(e.target.value))}
+                    onMouseUp={() => handleSetServo(targetPan, targetTilt)}
+                    onTouchEnd={() => handleSetServo(targetPan, targetTilt)}
+                    style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }}
+                  />
+                </div>
+
+                {/* Quick Presets */}
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                  <button
+                    onClick={() => handleSetServo(90, 90)}
+                    style={{ background: 'rgba(10, 48, 88, 0.6)', border: '1px solid rgba(33, 170, 255, 0.3)', color: '#8dc5ff', padding: '4px 8px', borderRadius: '5px', fontSize: '10px', cursor: 'pointer' }}
+                  >
+                    Center (90°, 90°)
+                  </button>
+                  <button
+                    onClick={() => handleSetServo(90, 120)}
+                    style={{ background: 'rgba(10, 48, 88, 0.6)', border: '1px solid rgba(33, 170, 255, 0.3)', color: '#8dc5ff', padding: '4px 8px', borderRadius: '5px', fontSize: '10px', cursor: 'pointer' }}
+                  >
+                    Zenith (90°, 120°)
+                  </button>
+                  <button
+                    onClick={() => handleSetServo(90, 45)}
+                    style={{ background: 'rgba(10, 48, 88, 0.6)', border: '1px solid rgba(33, 170, 255, 0.3)', color: '#8dc5ff', padding: '4px 8px', borderRadius: '5px', fontSize: '10px', cursor: 'pointer' }}
+                  >
+                    Horizon (90°, 45°)
+                  </button>
+                  <button
+                    onClick={() => handleSetServo(90, 30)}
+                    style={{ background: 'rgba(50, 20, 30, 0.6)', border: '1px solid rgba(255, 80, 80, 0.4)', color: '#ff8d8d', padding: '4px 8px', borderRadius: '5px', fontSize: '10px', cursor: 'pointer' }}
+                  >
+                    Stow (90°, 30°)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Panel>
           {/* Camera Status & Discovery Registry Panel */}
           <Panel title="Camera Hardware Registry" icon={Camera}>
             <div className="status-rows">

@@ -237,6 +237,32 @@ async def health_check():
     )
 
 
+# Backward-compatibility routes for ESP32 firmware pointing to /api/telemetry and /api/command
+@app.post("/api/telemetry", summary="Firmware legacy telemetry ingest")
+async def legacy_telemetry_ingest(payload: dict):
+    from app.services.serial_reader import serial_reader
+    serial_reader._build_from_json(payload)
+    return {"status": "success", "message": "Telemetry received"}
+
+
+@app.post("/api/command", summary="Firmware legacy command poll")
+async def legacy_command_poll(req: dict = None):
+    from app.core.providers import provider_manager
+    cmd = provider_manager.esp32_actuator.pop_queued_command()
+    if cmd:
+        verb = cmd.command.value if hasattr(cmd.command, "value") else str(cmd.command)
+        if verb == "SET_SERVO":
+            parts = []
+            if cmd.pan is not None:
+                parts.append(f"PAN:{int(cmd.pan)}")
+            if cmd.tilt is not None:
+                parts.append(f"TILT:{int(cmd.tilt)}")
+            return " ".join(parts) if parts else "CENTER"
+        return verb
+    return "OK"
+
+
+
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry_endpoint(websocket: WebSocket):
     """

@@ -71,16 +71,13 @@ const char* WIFI_SSID     = "KSO_NED26";
 const char* WIFI_PASSWORD = "Connect@ks0";
 
 // ---------- AI Backend ----------
-// Example:
-// http://192.168.1.100:8000/api/telemetry
-//
 // Replace this with your laptop/Raspberry Pi backend IP.
 const char* TELEMETRY_URL =
-    "http://192.168.1.100:8000/api/telemetry";
+    "http://172.25.45.140:8000/api/telemetry";
 
 // Backend command endpoint
 const char* COMMAND_URL =
-    "http://192.168.1.100:8000/api/command";
+    "http://172.25.45.140:8000/api/command";
 
 // ---------- Device ----------
 const char* DEVICE_ID = "SOLAR-SENTRY-EDGE-01";
@@ -258,6 +255,10 @@ void printSystemReport();
 void sendTelemetry();
 
 void pollAICommand();
+
+void processCommand(String command);
+
+void checkSerialCommands();
 
 void executeAICommand(String command);
 
@@ -486,6 +487,12 @@ void loop()
 
     printSystemReport();
   }
+
+  // ------------------------------------------------
+  // SERIAL COMMANDS
+  // ------------------------------------------------
+
+  checkSerialCommands();
 
   delay(10);
 }
@@ -1361,48 +1368,102 @@ void pollAICommand()
     Serial.print("[AI] Command received: ");
     Serial.println(response);
 
-    // ------------------------------------------------
-    // Simple command parsing
-    // ------------------------------------------------
-
-    if (response.indexOf("OBSERVE") >= 0)
-    {
-      executeAICommand("OBSERVE");
-    }
-
-    else if (response.indexOf("WAIT") >= 0)
-    {
-      executeAICommand("WAIT");
-    }
-
-    else if (response.indexOf("SUSPEND") >= 0)
-    {
-      executeAICommand("SUSPEND");
-    }
-
-    else if (response.indexOf("SCAN") >= 0)
-    {
-      executeAICommand("SCAN");
-    }
-
-    else if (response.indexOf("SAFE") >= 0)
-    {
-      executeAICommand("SAFE");
-    }
-
-    // Optional direct pan command
-    if (response.indexOf("PAN_LEFT") >= 0)
-    {
-      movePan(panPosition - 15);
-    }
-
-    if (response.indexOf("PAN_RIGHT") >= 0)
-    {
-      movePan(panPosition + 15);
-    }
+    processCommand(response);
   }
 
   http.end();
+}
+
+// ================================================================
+// PROCESS UNIFIED COMMAND (SERIAL OR HTTP)
+// ================================================================
+
+void processCommand(String command)
+{
+  command.trim();
+  if (command.length() == 0 || command == "OK") return;
+
+  Serial.print("[ACTUATOR CMD] Executing: ");
+  Serial.println(command);
+
+  // PAN / TILT direct position: PAN:90 or TILT:45
+  if (command.indexOf("PAN:") >= 0)
+  {
+    int idx = command.indexOf("PAN:") + 4;
+    int angle = command.substring(idx).toInt();
+    movePan(angle);
+  }
+
+  if (command.indexOf("TILT:") >= 0)
+  {
+    int idx = command.indexOf("TILT:") + 5;
+    int angle = command.substring(idx).toInt();
+    moveTilt(angle);
+  }
+
+  // Directional step commands
+  if (command.indexOf("PAN_LEFT") >= 0)
+  {
+    movePan(panPosition - 10);
+  }
+  else if (command.indexOf("PAN_RIGHT") >= 0)
+  {
+    movePan(panPosition + 10);
+  }
+
+  if (command.indexOf("TILT_UP") >= 0)
+  {
+    moveTilt(tiltPosition + 10);
+  }
+  else if (command.indexOf("TILT_DOWN") >= 0)
+  {
+    moveTilt(tiltPosition - 10);
+  }
+
+  if (command.indexOf("CENTER") >= 0)
+  {
+    movePan(90);
+    moveTilt(90);
+  }
+
+  // Observation state commands
+  if (command.indexOf("OBSERVE") >= 0)
+  {
+    executeAICommand("OBSERVE");
+  }
+  else if (command.indexOf("WAIT") >= 0)
+  {
+    executeAICommand("WAIT");
+  }
+  else if (command.indexOf("SUSPEND") >= 0)
+  {
+    executeAICommand("SUSPEND");
+  }
+  else if (command.indexOf("SCAN") >= 0)
+  {
+    executeAICommand("SCAN");
+  }
+  else if (command.indexOf("SAFE") >= 0 || command.indexOf("PARK") >= 0)
+  {
+    executeAICommand("SAFE");
+  }
+}
+
+// ================================================================
+// CHECK SERIAL COMMANDS
+// ================================================================
+
+void checkSerialCommands()
+{
+  while (Serial.available() > 0)
+  {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd.length() > 0)
+    {
+      processCommand(cmd);
+    }
+  }
 }
 
 // ================================================================
