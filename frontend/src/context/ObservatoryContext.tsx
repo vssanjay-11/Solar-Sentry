@@ -327,6 +327,29 @@ export const ObservatoryProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const unsubMsg = observatoryWs.onMessage((channel, payload) => {
       if (channel === 'telemetry') {
         setTelemetry(payload);
+        if (payload.state && payload.state !== 'OFFLINE') {
+          setIsOnline(true);
+        } else if (payload.state === 'OFFLINE') {
+          setIsOnline(false);
+        }
+
+        // In HARDWARE mode, also stream live points to history charts
+        if (payload.temperature !== undefined) {
+          setTelemetryHistory((prev) => {
+            const newPoint: TelemetryPoint = {
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+              temperature: payload.temperature,
+              humidity: payload.humidity,
+              pressure: payload.pressure,
+              lux: payload.lux,
+              rain_raw: payload.rain_raw,
+              pan: payload.pan,
+              tilt: payload.tilt,
+              ors: orsScore
+            };
+            return [...prev.slice(-40), newPoint];
+          });
+        }
       } else if (channel === 'ai_state') {
         if (payload.decision) setAiDecision(payload.decision);
         if (payload.confidence !== undefined) setAiConfidence(payload.confidence);

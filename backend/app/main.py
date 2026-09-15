@@ -161,18 +161,31 @@ async def camera_discovery_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan manager initializing persistence database, telemetry broadcaster, and camera discovery."""
+    """Lifespan manager initializing persistence database, telemetry broadcaster, camera discovery, and serial hardware reader."""
     logger.info("Initializing Solar Sentry persistence layer...")
     init_db()
     logger.info("Solar Sentry persistence layer initialized.")
 
     broadcaster_task = asyncio.create_task(background_telemetry_broadcaster())
     discovery_task = asyncio.create_task(camera_discovery_loop())
+
+    # Start USB Serial hardware reader if enabled
+    serial_task = None
+    if settings.ENABLE_SERIAL_READER:
+        from app.services.serial_reader import serial_reader
+        serial_task = serial_reader.start()
+
     yield
+
     broadcaster_task.cancel()
     discovery_task.cancel()
+    if serial_task:
+        from app.services.serial_reader import serial_reader
+        serial_reader.stop()
+
     try:
-        await asyncio.gather(broadcaster_task, discovery_task, return_exceptions=True)
+        tasks_to_cancel = [t for t in [broadcaster_task, discovery_task, serial_task] if t is not None]
+        await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
     except Exception:
         pass
     logger.info("Solar Sentry server shutdown complete.")

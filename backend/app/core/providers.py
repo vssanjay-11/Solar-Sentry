@@ -125,6 +125,12 @@ class ESP32SensorProvider(SensorProvider):
         self.last_received_time = time.time()
 
     async def is_connected(self) -> bool:
+        try:
+            from app.services.serial_reader import serial_reader
+            if serial_reader.is_connected:
+                return True
+        except Exception:
+            pass
         if self.last_telemetry is None:
             return False
         return (time.time() - self.last_received_time) < self.timeout_sec
@@ -391,10 +397,23 @@ class ESP32ActuatorProvider(ActuatorProvider):
     async def execute_command(self, command: Command) -> CommandResult:
         # If ESP32 is polling commands via HTTP, enqueue it
         self.queue_for_poll(command)
+        dispatched_serial = False
+        try:
+            from app.services.serial_reader import serial_reader
+            if serial_reader.is_connected:
+                dispatched_serial = await serial_reader.send_command(command.command)
+        except Exception as e:
+            logger.debug(f"Serial command dispatch notice: {e}")
+
+        msg = (
+            "Command dispatched immediately via USB Serial to ESP32."
+            if dispatched_serial else
+            "Command queued for physical ESP32 edge polling dispatch."
+        )
         return CommandResult(
             command_id=command.command_id,
-            status=CommandStatus.EXECUTING,
-            message="Command queued for physical ESP32 edge polling dispatch.",
+            status=CommandStatus.SUCCESS if dispatched_serial else CommandStatus.EXECUTING,
+            message=msg,
             current_pan=command.pan if command.pan is not None else 90,
             current_tilt=command.tilt if command.tilt is not None else 0,
             current_state=DeviceState.OBSERVE if command.command == "OBSERVE" else DeviceState.STANDBY,

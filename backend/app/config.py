@@ -38,6 +38,12 @@ class Settings(BaseModel):
     DEVICE_HEARTBEAT_TIMEOUT_SEC: int = Field(default=int(os.getenv("DEVICE_HEARTBEAT_TIMEOUT_SEC", "30")))
     DEFAULT_DEVICE_ID: str = Field(default=os.getenv("DEFAULT_DEVICE_ID", "esp32-sentry-01"))
 
+    # Serial hardware interface
+    SERIAL_PORT: str = Field(default=os.getenv("SERIAL_PORT", "COM3"))
+    SERIAL_BAUDRATE: int = Field(default=int(os.getenv("SERIAL_BAUDRATE", "115200")))
+    ENABLE_SERIAL_READER: bool = Field(default=os.getenv("ENABLE_SERIAL_READER", "True").lower() in ("true", "1", "t"))
+
 
 settings = Settings()
+
 

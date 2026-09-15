@@ -67,8 +67,8 @@
 // ================================================================
 
 // ---------- Wi-Fi ----------
-const char* WIFI_SSID     = "Rea";
-const char* WIFI_PASSWORD = "vssanjay11";
+const char* WIFI_SSID     = "KSO_NED26";
+const char* WIFI_PASSWORD = "Connect@ks0";
 
 // ---------- AI Backend ----------
 // Example:
