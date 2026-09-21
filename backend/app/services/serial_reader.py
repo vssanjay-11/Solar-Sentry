@@ -155,6 +155,11 @@ class SerialTelemetryReader:
             except Exception:
                 pass
 
+        # Log ESP32 bracketed output (actuator execution, self-check, network)
+        if line_clean.startswith("["):
+            logger.info(f"[SerialReader] ESP32 Output: {line_clean}")
+            return
+
         # 3. Check for Key: Value format
         if ":" in line:
             parts = line.split(":", 1)

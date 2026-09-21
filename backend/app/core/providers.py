@@ -385,10 +385,27 @@ class DemoActuatorProvider(ActuatorProvider):
         if command.tilt is not None and verb != "SET_SERVO":
             self.tilt = max(30, min(150, command.tilt))
 
+        # Mirror to physical serial hardware if connected so user's physical servos respond immediately
+        try:
+            from app.services.serial_reader import serial_reader
+            if serial_reader.is_connected:
+                lines_to_send = []
+                if verb == "SET_SERVO":
+                    if command.pan is not None:
+                        lines_to_send.append(f"PAN:{int(command.pan)}")
+                    if command.tilt is not None:
+                        lines_to_send.append(f"TILT:{int(command.tilt)}")
+                elif verb in ["PAN_LEFT", "PAN_RIGHT", "TILT_UP", "TILT_DOWN", "CENTER", "OBSERVE", "WAIT", "SUSPEND", "SCAN", "SAFE", "PARK"]:
+                    lines_to_send.append(verb)
+                for line in lines_to_send:
+                    await serial_reader.send_command(line)
+        except Exception as e:
+            logger.debug(f"Serial mirror error: {e}")
+
         return CommandResult(
             command_id=command.command_id,
             status=CommandStatus.SUCCESS,
-            message=f"Simulated slew completed to (Pan: {self.pan}°, Tilt: {self.tilt}°). State: {self.state.value}",
+            message=f"Actuator slew completed to (Pan: {self.pan}°, Tilt: {self.tilt}°). State: {self.state.value}",
             current_pan=self.pan,
             current_tilt=self.tilt,
             current_state=self.state,
